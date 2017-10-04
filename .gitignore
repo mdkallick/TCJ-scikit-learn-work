@@ -1,0 +1,4 @@
+skenv/
+dist.csv
+new_clusters.csv
+__pycache__/online_affinity_propagation_.cpython-36.pyc
