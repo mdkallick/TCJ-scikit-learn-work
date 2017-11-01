@@ -15,7 +15,7 @@ from copy import deepcopy
 from scipy.stats import norm
 from online_affinity_propagation_ import OnlineAffinityPropagation
 from pairwise import custom_distances
-from match_names import cluster_from_file
+# from match_names import cluster_from_file
 
 """
 Remove all of the stop words in a dataframe using a list of stopwords and
@@ -96,41 +96,92 @@ def get_clean_data(datafolder, filename, stoplistfile, headers, datahead):
     df.dropna(subset=cols, inplace=True)
     return df
 
-if __name__ == '__main__':
-    # check that we get the right output for strings
-
-    def jaccard_distance(a, b, N=3):
-        """Calculate the jaccard distance between ngrams from words A and B"""
-        while(len(a) < N):
-            a += ' '
-        while(len(b) < N):
-            b += ' '
-        a = [a[i:i+N] for i in range(len(a)-N+1)]
-        b = [b[i:i+N] for i in range(len(b)-N+1)]
-        a = set(a)
-        b = set(b)
-        return float(1.0 * len(a&b)/len(a|b))
-
-    data_folder = '/home/mathiaskallick/Documents/Box/data/cust_financials/'
-    file_name = 's3_arap_data.csv'
-    headers = ['Borrower Name', 'Customer or Vendor']
+def gui_func(data_folder, file_name, file_out):
+    # data_folder = './'
+    # file_name = 'badges.data.csv'
+    headers = ['Name']
 
     stoplist_file = 'arap_cust_vend_stopwords.txt'
-    datahead = ['Customer or Vendor']
+    # datahead = ['Customer or Vendor']
+    datahead = ['Name']
 
     X = get_clean_data(data_folder, file_name, stoplist_file, headers, datahead)
 
-    X = X['Customer or Vendor'].values
+    # X = X['Customer or Vendor'].values
+    X = X['Name'].values
 
-    print("X: {}".format(X))
+    # print("X: {}".format(X))
+    #
+    # print("X.shape: {}".format(X.shape))
+    # train_data = np.copy(X[:200,]) #6000 for full data set
+    # test_data = np.copy(X[200:,])
+    train_data = np.copy(X[:,])
 
-    print("X.shape: {}".format(X.shape))
-    train_data = np.copy(X[:6000,]) #6000 for full data set
-    test_data = np.copy(X[6000:,])
+    oap = OnlineAffinityPropagation(affinity='custom',
+                                    affinity_function=jaccard_distance,
+                                    max_iter=1000, verbose=True,
+                                    preference=.8, convergence_iter=25)
+
+    starttime = time.clock()
+    oap.fit(train_data)
+    endtime = time.clock()
+
+    print("fit runtime: {}".format(endtime-starttime))
+
+    cluster_array = np.concatenate([
+                    np.reshape(oap.data_,(oap.data_.shape[0],1)),
+                    np.reshape(oap.labels_,(oap.labels_.shape[0],1))], axis=1)
+                    # np.reshape(tmpnames, (tmpnames.shape[0], 1))],axis=1)
+
+    # cluster_array = cluster_array[np.where(cluster_array[:,1] != -1)]
+    #
+    #cluster_array = cluster_array[cluster_array[:,1].argsort()]
+
+    # print("clusters:\n{}".format(cluster_array))
+
+    txt = pd.DataFrame(cluster_array)
+    # txt.to_csv('no_re_compile_clusters.csv')
+    txt.to_csv(file_out)
+
+def jaccard_distance(a, b, N=3):
+    """Calculate the jaccard distance between ngrams from words A and B"""
+    while(len(a) < N):
+        a += ' '
+    while(len(b) < N):
+        b += ' '
+    a = [a[i:i+N] for i in range(len(a)-N+1)]
+    b = [b[i:i+N] for i in range(len(b)-N+1)]
+    a = set(a)
+    b = set(b)
+    return float(1.0 * len(a&b)/len(a|b))
+
+if __name__ == '__main__':
+    # data_folder = '/home/mathiaskallick/Documents/Box/data/cust_financials/'
+    # file_name = 's3_arap_data.csv'
+    # headers = ['Borrower Name', 'Customer or Vendor']
+    data_folder = './'
+    file_name = 'badges.data.csv'
+    headers = ['Name']
+
+    stoplist_file = 'arap_cust_vend_stopwords.txt'
+    # datahead = ['Customer or Vendor']
+    datahead = ['Name']
+
+    X = get_clean_data(data_folder, file_name, stoplist_file, headers, datahead)
+
+    # X = X['Customer or Vendor'].values
+    X = X['Name'].values
+
+    # print("X: {}".format(X))
+    #
+    # print("X.shape: {}".format(X.shape))
+    # train_data = np.copy(X[:200,]) #6000 for full data set
+    # test_data = np.copy(X[200:,])
+    train_data = np.copy(X[:,])
 
     init_cluster = True
-    add_data_to_model = True
-    recluster_model = True and (init_cluster or add_data_to_model)
+    add_data_to_model = False
+    recluster_model = False and (init_cluster or add_data_to_model)
 
     oap=None
 
